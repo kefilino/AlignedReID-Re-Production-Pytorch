@@ -2,7 +2,7 @@
 The mapping is corresponding to transform_duke.py.
 """
 
-from __future__ import print_function
+
 
 import sys
 sys.path.insert(0, '.')
@@ -49,7 +49,7 @@ def save_im_name_mapping(raw_dir, ori_to_new_im_name_file):
     im_names_ = [osp.join(dir_name, n) for n in im_names_]
     im_names += im_names_
   new_im_names = map_im_names(im_names, parse_original_im_name, new_im_name_tmpl)
-  ori_to_new_im_name = dict(zip(im_names, new_im_names))
+  ori_to_new_im_name = dict(list(zip(im_names, new_im_names)))
   save_pickle(ori_to_new_im_name, ori_to_new_im_name_file)
   print('File saved to {}'.format(ori_to_new_im_name_file))
 

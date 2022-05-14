@@ -1,7 +1,7 @@
-from __future__ import print_function
+
 import os
 import os.path as osp
-import cPickle as pickle
+import pickle as pickle
 from scipy import io
 import datetime
 import time
@@ -60,7 +60,7 @@ def transfer_optim_state(state, device_id=-1):
     state: An torch.optim.Optimizer.state
     device_id: gpu id, or -1 which means transferring to cpu
   """
-  for key, val in state.items():
+  for key, val in list(state.items()):
     if isinstance(val, dict):
       transfer_optim_state(val, device_id=device_id)
     elif isinstance(val, Variable):
@@ -280,7 +280,7 @@ def load_state_dict(model, src_state_dict):
   from torch.nn import Parameter
 
   dest_state_dict = model.state_dict()
-  for name, param in src_state_dict.items():
+  for name, param in list(src_state_dict.items()):
     if name not in dest_state_dict:
       continue
     if isinstance(param, Parameter):
@@ -288,7 +288,7 @@ def load_state_dict(model, src_state_dict):
       param = param.data
     try:
       dest_state_dict[name].copy_(param)
-    except Exception, msg:
+    except Exception as msg:
       print("Warning: Error occurs when copying '{}': {}"
             .format(name, str(msg)))
 

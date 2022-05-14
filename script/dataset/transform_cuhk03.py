@@ -2,7 +2,7 @@
 train/val/test set, in order to support the unified dataset interface.
 """
 
-from __future__ import print_function
+
 
 import sys
 sys.path.insert(0, '.')
@@ -92,7 +92,7 @@ def transform(zip_file, train_test_partition_file, save_dir=None):
     # Sort ids, so that id-to-label mapping remains the same when running
     # the code on different machines.
     trainval_ids.sort()
-    trainval_ids2labels = dict(zip(trainval_ids, range(len(trainval_ids))))
+    trainval_ids2labels = dict(list(zip(trainval_ids, list(range(len(trainval_ids))))))
     train_val_partition = \
       partition_train_val_set(trainval_im_names, parse_im_name, num_val_ids=100)
     train_im_names = train_val_partition['train_im_names']
@@ -101,7 +101,7 @@ def transform(zip_file, train_test_partition_file, save_dir=None):
     # Sort ids, so that id-to-label mapping remains the same when running
     # the code on different machines.
     train_ids.sort()
-    train_ids2labels = dict(zip(train_ids, range(len(train_ids))))
+    train_ids2labels = dict(list(zip(train_ids, list(range(len(train_ids))))))
 
     # A mark is used to denote whether the image is from
     #   query (mark == 0), or

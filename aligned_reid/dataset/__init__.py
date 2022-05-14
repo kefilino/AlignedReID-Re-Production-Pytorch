@@ -102,19 +102,19 @@ def create_dataset(
     num_multi_query = np.sum(np.array(marks) == 2)
 
   # Print dataset information
-  print('-' * 40)
-  print('{} {} set'.format(name, part))
-  print('-' * 40)
-  print('NO. Images: {}'.format(len(im_names)))
-  print('NO. IDs: {}'.format(num_ids))
+  print(('-' * 40))
+  print(('{} {} set'.format(name, part)))
+  print(('-' * 40))
+  print(('NO. Images: {}'.format(len(im_names))))
+  print(('NO. IDs: {}'.format(num_ids)))
 
   try:
-    print('NO. Query Images: {}'.format(num_query))
-    print('NO. Gallery Images: {}'.format(num_gallery))
-    print('NO. Multi-query Images: {}'.format(num_multi_query))
+    print(('NO. Query Images: {}'.format(num_query)))
+    print(('NO. Gallery Images: {}'.format(num_gallery)))
+    print(('NO. Multi-query Images: {}'.format(num_multi_query)))
   except:
     pass
 
-  print('-' * 40)
+  print(('-' * 40))
 
   return ret_set

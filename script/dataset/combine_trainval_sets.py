@@ -1,4 +1,4 @@
-from __future__ import print_function
+
 
 import sys
 sys.path.insert(0, '.')
@@ -33,7 +33,7 @@ def move_ims(
   unique_ids = list(set(ids))
   unique_ids.sort()
   id_mapping = dict(
-    zip(unique_ids, range(new_start_id, new_start_id + len(unique_ids))))
+    list(zip(unique_ids, list(range(new_start_id, new_start_id + len(unique_ids))))))
 
   new_im_names = []
   cnt = defaultdict(int)
@@ -63,9 +63,9 @@ def combine_trainval_sets(
     new_start_id += len(id_mapping)
     new_im_names += new_im_names_
 
-  new_ids = range(new_start_id)
+  new_ids = list(range(new_start_id))
   partitions = {'trainval_im_names': new_im_names,
-                'trainval_ids2labels': dict(zip(new_ids, new_ids)),
+                'trainval_ids2labels': dict(list(zip(new_ids, new_ids))),
                 }
   partition_file = ospj(save_dir, 'partitions.pkl')
   save_pickle(partitions, partition_file)

@@ -33,7 +33,7 @@ class TrainSet(Dataset):
     self.ids_to_im_inds = defaultdict(list)
     for ind, id in enumerate(im_ids):
       self.ids_to_im_inds[id].append(ind)
-    self.ids = self.ids_to_im_inds.keys()
+    self.ids = list(self.ids_to_im_inds.keys())
 
     super(TrainSet, self).__init__(
       dataset_size=len(self.ids),
@@ -53,7 +53,7 @@ class TrainSet(Dataset):
     im_names = [self.im_names[ind] for ind in inds]
     ims = [np.asarray(Image.open(osp.join(self.im_dir, name)))
            for name in im_names]
-    ims, mirrored = zip(*[self.pre_process_im(im) for im in ims])
+    ims, mirrored = list(zip(*[self.pre_process_im(im) for im in ims]))
     labels = [self.ids2labels[self.ids[ptr]] for _ in range(self.ims_per_id)]
     return ims, im_names, labels, mirrored
 
@@ -70,7 +70,7 @@ class TrainSet(Dataset):
     if self.epoch_done and self.shuffle:
       np.random.shuffle(self.ids)
     samples, self.epoch_done = self.prefetcher.next_batch()
-    im_list, im_names, labels, mirrored = zip(*samples)
+    im_list, im_names, labels, mirrored = list(zip(*samples))
     # t = time.time()
     # Transform the list into a numpy array with shape [N, ...]
     ims = np.stack(np.concatenate(im_list))

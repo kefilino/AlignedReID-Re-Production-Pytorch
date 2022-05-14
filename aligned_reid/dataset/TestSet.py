@@ -1,4 +1,4 @@
-from __future__ import print_function
+
 import sys
 import time
 import os.path as osp
@@ -68,7 +68,7 @@ class TestSet(Dataset):
     if self.epoch_done and self.shuffle:
       self.prng.shuffle(self.im_names)
     samples, self.epoch_done = self.prefetcher.next_batch()
-    im_list, ids, cams, im_names, marks = zip(*samples)
+    im_list, ids, cams, im_names, marks = list(zip(*samples))
     # Transform the list into a numpy array with shape [N, ...]
     ims = np.stack(im_list, axis=0)
     ids = np.array(ids)

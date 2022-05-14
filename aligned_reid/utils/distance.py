@@ -180,9 +180,9 @@ def low_memory_matrix_op(
         else:
           # Clean the current line
           sys.stdout.write("\033[F\033[K")
-        print('Matrix part ({}, {}) / ({}, {}), +{:.2f}s, total {:.2f}s'
+        print(('Matrix part ({}, {}) / ({}, {}), +{:.2f}s, total {:.2f}s'
               .format(i + 1, j + 1, x_num_splits, y_num_splits,
-                      time.time() - last_time, time.time() - st))
+                      time.time() - last_time, time.time() - st)))
         last_time = time.time()
     mat[i] = np.concatenate(mat[i], axis=1)
   mat = np.concatenate(mat, axis=0)

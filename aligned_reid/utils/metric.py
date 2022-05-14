@@ -5,7 +5,7 @@ reid/evaluation_metrics/ranking.py. Modifications:
 2) In the single-gallery-shot evaluation case, the time of repeats is changed 
    from 10 to 100.
 """
-from __future__ import absolute_import
+
 from collections import defaultdict
 
 import numpy as np
@@ -14,7 +14,7 @@ from sklearn.metrics import average_precision_score
 
 def _unique_sample(ids_dict, num):
   mask = np.zeros(num, dtype=np.bool)
-  for _, indices in ids_dict.items():
+  for _, indices in list(ids_dict.items()):
     i = np.random.choice(indices)
     mask[i] = True
   return mask
@@ -141,12 +141,12 @@ def mean_ap(
   cur_version = sklearn.__version__
   required_version = '0.18.1'
   if cur_version != required_version:
-    print('User Warning: Version {} is required for package scikit-learn, '
+    print(('User Warning: Version {} is required for package scikit-learn, '
           'your current version is {}. '
           'As a result, the mAP score may not be totally correct. '
           'You can try `pip uninstall scikit-learn` '
           'and then `pip install scikit-learn=={}`'.format(
-      required_version, cur_version, required_version))
+      required_version, cur_version, required_version)))
   # -------------------------------------------------------------------------
 
   # Ensure numpy array
