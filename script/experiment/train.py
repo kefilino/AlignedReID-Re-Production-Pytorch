@@ -1,6 +1,6 @@
 """Train with optional Global Distance, Local Distance, Identification Loss."""
 
-
+from pickle import FALSE
 import sys
 sys.path.insert(0, '.')
 
@@ -81,6 +81,8 @@ class Config(object):
     parser.add_argument('--staircase_decay_multiply_factor',
                         type=float, default=0.1)
     parser.add_argument('--total_epochs', type=int, default=150)
+
+    parser.add_argument('--query_mode', type=str2bool, default=False)
 
     args = parser.parse_known_args()[0]
 
@@ -169,6 +171,18 @@ class Config(object):
       prng=prng)
     self.test_set_kwargs.update(dataset_kwargs)
 
+    prng = np.random
+    if self.seed is not None:
+      prng = np.random.RandomState(self.seed)
+    self.query_set_kwargs = dict(
+      part='query',
+      batch_size=self.test_batch_size,
+      final_batch=self.test_final_batch,
+      shuffle=self.test_shuffle,
+      mirror_type=self.test_mirror_type,
+      prng=prng)
+    self.query_set_kwargs.update(dataset_kwargs)
+
     ###############
     # ReID Model  #
     ###############
@@ -213,6 +227,9 @@ class Config(object):
 
     self.resume = args.resume
 
+    # User input query
+    self.query_mode = args.query_mode
+
     #######
     # Log #
     #######
@@ -251,9 +268,9 @@ class Config(object):
       self.exp_dir = args.exp_dir
 
     self.stdout_file = osp.join(
-      self.exp_dir, 'stdout_{}.txt'.format(time_str()))
+      self.exp_dir, 'stdout_{}.txt'.format(time_str())).replace(':', '-')
     self.stderr_file = osp.join(
-      self.exp_dir, 'stderr_{}.txt'.format(time_str()))
+      self.exp_dir, 'stderr_{}.txt'.format(time_str())).replace(':', '-')
 
     # Saving model weights and optimizer states, for resuming.
     self.ckpt_file = osp.join(self.exp_dir, 'ckpt.pth')
@@ -304,10 +321,10 @@ def main():
 
   # Dump the configurations to log.
   import pprint
-  print('-' * 60)
+  print(('-' * 60))
   print('cfg.__dict__')
   pprint.pprint(cfg.__dict__)
-  print('-' * 60)
+  print(('-' * 60))
 
   ###########
   # Dataset #
@@ -361,6 +378,40 @@ def main():
   # is to cope with the case when you load the checkpoint to a new device.
   TMO(modules_optims)
 
+  #########
+  # Query #
+  #########
+
+  def query():
+    if cfg.model_weight_file != '':
+      map_location = (lambda storage, loc: storage)
+      sd = torch.load(cfg.model_weight_file, map_location=map_location)
+      load_state_dict(model, sd)
+      print(('Loaded model weights from {}'.format(cfg.model_weight_file)))
+    else:
+      print('Model weights not loaded. Please use the model_weight_file arguments.')
+      return
+    
+    query_set = create_dataset(**cfg.query_set_kwargs)
+
+    use_local_distance = (cfg.l_loss_weight > 0) \
+                         and cfg.local_dist_own_hard_sample
+
+    query_set.set_feat_func(ExtractFeature(model_w, TVT))
+    print(('\n=========> Probe query on gallery <=========\n'))
+    return query_set.probe(
+      normalize_feat=cfg.normalize_feature,
+      use_local_distance=use_local_distance,)
+
+  if cfg.query_mode:
+    results = query()
+    imgnames = [osp.basename(name) for name in results[:,:1].flatten()]
+    imgmaxlen = len(max(imgnames, key = len))
+    print('{:<6} {:<{}} {}'.format('Rank', 'Image Name', imgmaxlen+2, 'Distance'))
+    for idx, result in enumerate(results):
+      print('{:<6} {:<{}} {}'.format(idx + 1, osp.basename(result[0]), imgmaxlen+2, result[1]))
+    return
+
   ########
   # Test #
   ########
@@ -371,7 +422,7 @@ def main():
         map_location = (lambda storage, loc: storage)
         sd = torch.load(cfg.model_weight_file, map_location=map_location)
         load_state_dict(model, sd)
-        print('Loaded model weights from {}'.format(cfg.model_weight_file))
+        print(('Loaded model weights from {}'.format(cfg.model_weight_file)))
       else:
         load_ckpt(modules_optims, cfg.ckpt_file)
 
@@ -380,7 +431,7 @@ def main():
 
     for test_set, name in zip(test_sets, test_set_names):
       test_set.set_feat_func(ExtractFeature(model_w, TVT))
-      print('\n=========> Test on dataset: {} <=========\n'.format(name))
+      print(('\n=========> Test on dataset: {} <=========\n'.format(name)))
       test_set.eval(
         normalize_feat=cfg.normalize_feature,
         use_local_distance=use_local_distance)
