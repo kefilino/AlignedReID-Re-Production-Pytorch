@@ -275,8 +275,6 @@ class QuerySet(Dataset):
     g_paths = np.array(self.im_paths[1:])
     result = np.argsort(q_g_dist[0])[:10]
 
-    print(type(q_g_dist))
-
     return np.stack((g_paths[result], q_g_dist[0][result]), axis=1)
 
     # multi-query
