@@ -96,8 +96,8 @@ def create_dataset(
       **kwargs)
 
   elif part == 'query':
-    marks = partitions['test_marks']
     kwargs.update(cmc_kwargs)
+    
     gal_dir = input('Enter gallery directory: ')
     if not osp.isdir(gal_dir):
       print('Invalid directory.')
