@@ -186,17 +186,8 @@ class QuerySet(Dataset):
     # query, gallery, multi-query indices
     q_inds = marks == 0
     g_inds = marks == 1
-    mq_inds = marks == 2
 
     # A helper function just for avoiding code duplication.
-    def compute_score(dist_mat):
-      mAP, cmc_scores = self.eval_map_cmc(
-        q_g_dist=dist_mat,
-        separate_camera_set=self.separate_camera_set,
-        single_gallery_shot=self.single_gallery_shot,
-        first_match_break=self.first_match_break,
-        topk=10)
-      return mAP, cmc_scores
 
     # A helper function just for avoiding code duplication.
     def low_memory_local_dist(x, y):
