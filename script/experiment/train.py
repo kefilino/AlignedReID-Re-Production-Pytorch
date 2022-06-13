@@ -389,8 +389,9 @@ def main():
       load_state_dict(model, sd)
       print(('Loaded model weights from {}'.format(cfg.model_weight_file)))
     else:
-      print('Model weights not loaded. Please use the model_weight_file arguments.')
-      return
+      load_ckpt(modules_optims, cfg.ckpt_file)
+      # print('Model weights not loaded. Please use the model_weight_file arguments.')
+      # return
     
     query_set = create_dataset(**cfg.query_set_kwargs)
 
