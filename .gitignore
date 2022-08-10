@@ -4,3 +4,4 @@
 exp/
 tmp/
 *.pyc
+gradio_queue.db
