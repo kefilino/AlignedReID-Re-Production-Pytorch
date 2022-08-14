@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.nn.parallel import DataParallel
 
-from subprocess import run
+from unittest.mock import patch
 import time
 import os.path as osp
 from tensorboardX import SummaryWriter
@@ -234,6 +234,8 @@ class Config(object):
 
     # Saving model weights and optimizer states, for resuming.
     self.ckpt_file = osp.join(self.exp_dir, 'ckpt.pth')
+    # Saving model weights only.
+    self.model_weight_save_file = osp.join(self.exp_dir, 'model_weight.pth')
     # Just for loading a pretrained model; no optimizer states is needed.
     self.model_weight_file = args["model_weight_file"]
 
@@ -370,7 +372,7 @@ def main(cfg):
     print('{:<6} {:<{}} {}'.format('Rank', 'Image Name', imgmaxlen+2, 'Distance'))
     for idx, result in enumerate(results):
       print('{:<6} {:<{}} {}'.format(idx + 1, osp.basename(result[0]), imgmaxlen+2, result[1]))
-    return
+    return results
 
   ########
   # Test #
@@ -630,6 +632,7 @@ def main(cfg):
     # save ckpt
     if cfg.log_to_file:
       save_ckpt(modules_optims, ep + 1, 0, cfg.ckpt_file)
+      torch.save(model, cfg.model_weight_save_file)
 
   ########
   # Test #
@@ -700,7 +703,7 @@ def start_test(test_sys_device_ids, test_run, test_set_seed,
               test_ims_per_id, test_log_to_file, test_normalize_feature,
               test_local_dist_own_hard_sample, test_global_margin,
               test_local_margin, test_g_loss_weight, test_l_loss_weight, 
-              test_id_loss_weight, test_resume, test_exp_dir, 
+              test_id_loss_weight, test_exp_dir, 
               test_model_weight_file):
     test_args = {
       "sys_device_ids": eval(test_sys_device_ids),
@@ -722,7 +725,7 @@ def start_test(test_sys_device_ids, test_run, test_set_seed,
       "l_loss_weight": test_l_loss_weight,
       "id_loss_weight": test_id_loss_weight,
       "only_test": True,
-      "resume": str2bool(test_resume),
+      "resume": False,
       "exp_dir": test_exp_dir,
       "model_weight_file": test_model_weight_file,
       "base_lr": 1e-3,
@@ -746,29 +749,91 @@ def start_test(test_sys_device_ids, test_run, test_set_seed,
 
     return scores
 
+
+def start_query(query_sys_device_ids, query_run, query_set_seed,
+                query_dataset, query_trainset_part, query_resize_h_w, 
+                query_crop_prob, query_crop_ratio, query_ids_per_batch,
+                query_ims_per_id, query_log_to_file, query_normalize_feature,
+                query_local_dist_own_hard_sample, query_global_margin,
+                query_local_margin, query_g_loss_weight, query_l_loss_weight, 
+                query_id_loss_weight, query_exp_dir, 
+                query_model_weight_file, query_image, query_gallery_folder):
+    query_args = {
+      "sys_device_ids": eval(query_sys_device_ids),
+      "run": int(query_run),
+      "set_seed": str2bool(query_set_seed),
+      "dataset": query_dataset,
+      "trainset_part": query_trainset_part,
+      "resize_h_w": eval(query_resize_h_w),
+      "crop_prob": query_crop_prob,
+      "crop_ratio": query_crop_ratio,
+      "ids_per_batch": int(query_ids_per_batch),
+      "ims_per_id": int(query_ims_per_id),
+      "log_to_file": str2bool(query_log_to_file),
+      "normalize_feature": str2bool(query_normalize_feature),
+      "local_dist_own_hard_sample": str2bool(query_local_dist_own_hard_sample),
+      "global_margin": query_global_margin,
+      "local_margin": query_local_margin,
+      "g_loss_weight": query_g_loss_weight,
+      "l_loss_weight": query_l_loss_weight,
+      "id_loss_weight": query_id_loss_weight,
+      "only_test": False,
+      "resume": False,
+      "exp_dir": query_exp_dir,
+      "model_weight_file": query_model_weight_file,
+      "base_lr": 1e-3,
+      "lr_decay_type": 'staircase',
+      "exp_decay_at_epoch": 0,
+      "staircase_decay_at_epochs": 0,
+      "staircase_decay_multiply_factor": 0,
+      "total_epochs": 0,
+      "query_mode": True,
+    }
+
+    cfg = Config(query_args)
+
+    with patch('builtins.input') as input_mock:
+      input_mock.side_effect = [
+          query_gallery_folder,
+          query_image
+      ]
+      results = main(cfg)
+      
+    distances = ""
+    imgnames = [osp.basename(name) for name in results[:,:1].flatten()]
+    imgmaxlen = len(max(imgnames, key = len))
+    distances += '{:<6} {:<{}} {}\n'.format('Rank', 'Image Name', imgmaxlen+2, 'Distance')
+    for idx, result in enumerate(results):
+      distances += '{:<6} {:<{}} {}\n'.format(idx + 1, osp.basename(result[0]), imgmaxlen+2, result[1])
+
+    return results[0][0],results[1][0],results[2][0],results[3][0],\
+            results[4][0],results[5][0],results[6][0],results[7][0],\
+            results[8][0],results[9][0],distances
+
+
 if __name__ == '__main__':
-  with gr.Blocks() as app:
+  with gr.Blocks(title="AlignedReID Web App") as app:
     gr.Markdown("Person Re-identification using AlignedReID Method")
     with gr.Tabs():
       with gr.TabItem("Training & Testing"):
         with gr.Row():
           with gr.Column():
             with gr.Row():
-              train_sys_device_ids = gr.Textbox(value='(0,)', label='System Device IDs')
-              train_run = gr.Number(value=1, label='Number of Run(s)')
+              train_sys_device_ids = gr.Textbox(value='(0,)', label='System device IDs')
+              train_run = gr.Number(value=1, label='Number of run(s)')
             with gr.Row():
               train_set_seed = gr.Radio(choices=['True', 'False'], value='False', label='Use seed to randomize dataset distribution')
-              train_dataset = gr.Radio(choices=['market1501', 'cuhk03', 'duke', 'combined'], value='market1501', label='Person Re-ID dataset to use')
+              train_dataset = gr.Radio(choices=['market1501', 'cuhk03', 'duke', 'combined'], value='market1501', label='Person re-ID dataset')
             with gr.Row():
-              train_trainset_part = gr.Radio(choices=['trainval', 'train'], value='trainval', label='Trainset part to use')
+              train_trainset_part = gr.Radio(choices=['trainval', 'train'], value='trainval', label='Trainset part')
               
-              train_resize_h_w = gr.Textbox(value='(224,224)', label='Resize images height and width to (h,w)')
+              train_resize_h_w = gr.Textbox(value='(224,224)', label='Resize images height & width to (h,w)')
             with gr.Row():
-              train_crop_prob = gr.Number(value=0, label='The probability of each image to go through cropping')
+              train_crop_prob = gr.Number(value=0, label='Image cropping probability')
               train_crop_ratio = gr.Number(value=1, label='Cropping ratio (if == 1.0, no cropping)')
             with gr.Row():
-              train_ids_per_batch = gr.Number(value=16, label='Number of IDs per batch')
-              train_ims_per_id = gr.Number(value=4, label='Number of imagess per batch')
+              train_ids_per_batch = gr.Number(value=16, label='IDs per batch')
+              train_ims_per_id = gr.Number(value=4, label='Images per batch')
 
             with gr.Row():
               train_log_to_file = gr.Radio(choices=['True', 'False'], value='True', label='Save logs to file')
@@ -776,27 +841,29 @@ if __name__ == '__main__':
               train_local_dist_own_hard_sample = gr.Radio(choices=['True', 'False'], value='False', label='Use own hard sample for local distance')
 
             with gr.Row():
-              train_global_margin = gr.Number(value=0.5, label='Global margin for triplet hard loss function')
-              train_local_margin = gr.Number(value=0.5, label='Local margin for triplet hard loss function')
+              train_global_margin = gr.Number(value=0.5, label='Global margin for TriHard loss function')
+              train_local_margin = gr.Number(value=0.5, label='Local margin for TriHard loss function')
             with gr.Row():
               train_g_loss_weight = gr.Number(value=0.5, label='Global loss weight')
               train_l_loss_weight = gr.Number(value=0.5, label='Local loss weight')
               train_id_loss_weight = gr.Number(value=0., label='Identity loss weight')
             
             with gr.Row():
-              train_resume = gr.Radio(choices=['True', 'False'], value='False', label='Resume previous runs')
+              train_resume = gr.Radio(choices=['True', 'False'], value='False', label='Resume previous run(s)')
               train_exp_dir = gr.Textbox(label='Experiment directory (uses root folder if left empty)')
             
             with gr.Row():
               train_base_lr = gr.Number(value=1e-3, label='Base learning rate')
               train_lr_decay_type = gr.Radio(choices=['exp', 'staircase'], value='staircase', label='Learning rate decay type')
             with gr.Row():
-              train_exp_decay_at_epoch = gr.Number(value=76, label='Epoch in which exponential decay happen (if used)')
-              train_staircase_decay_at_epochs = gr.Textbox(value='(80,160)', label='Epochs in which staircase decay happen (if used)')
+              train_exp_decay_at_epoch = gr.Number(value=151, label='Epoch in which exponential decay happen')
+              train_staircase_decay_at_epochs = gr.Textbox(value='(80,160)', label='Epochs in which staircase decay happen')
             with gr.Row():
               train_staircase_decay_multiply_factor = gr.Number(value=0.1, label='Staircase decay multiply factor')
-              train_total_epochs = gr.Number(value=240, label='Total epochs')
-            train_button = gr.Button("Start").style(full_width=True)
+              train_total_epochs = gr.Number(value=300, label='Total epochs')
+
+            with gr.Row():
+              train_button = gr.Button("Start").style(full_width=True)
 
           with gr.Column():
             gr.Markdown("Training & Testing Scores Output")
@@ -806,21 +873,21 @@ if __name__ == '__main__':
         with gr.Row():
           with gr.Column():
             with gr.Row():
-              test_sys_device_ids = gr.Textbox(value='(0,)', label='System Device IDs')
-              test_run = gr.Number(value=1, label='Number of Run(s)')
+              test_sys_device_ids = gr.Textbox(value='(0,)', label='System device IDs')
+              test_run = gr.Number(value=1, label='Number of run(s)')
             with gr.Row():
               test_set_seed = gr.Radio(choices=['True', 'False'], value='False', label='Use seed to randomize dataset distribution')
-              test_dataset = gr.Radio(choices=['market1501', 'cuhk03', 'duke', 'combined'], value='market1501', label='Person Re-ID dataset to use')
+              test_dataset = gr.Radio(choices=['market1501', 'cuhk03', 'duke', 'combined'], value='market1501', label='Person re-ID dataset')
             with gr.Row():
-              test_trainset_part = gr.Radio(choices=['trainval', 'train'], value='trainval', label='Trainset part to use')
+              test_trainset_part = gr.Radio(choices=['trainval', 'train'], value='trainval', label='Trainset part')
               
-              test_resize_h_w = gr.Textbox(value='(224,224)', label='Resize images height and width to (h,w)')
+              test_resize_h_w = gr.Textbox(value='(224,224)', label='Resize images height & width to (h,w)')
             with gr.Row():
-              test_crop_prob = gr.Number(value=0, label='The probability of each image to go through cropping')
+              test_crop_prob = gr.Number(value=0, label='Image cropping probability')
               test_crop_ratio = gr.Number(value=1, label='Cropping ratio (if == 1.0, no cropping)')
             with gr.Row():
-              test_ids_per_batch = gr.Number(value=16, label='Number of IDs per batch')
-              test_ims_per_id = gr.Number(value=4, label='Number of imagess per batch')
+              test_ids_per_batch = gr.Number(value=16, label='IDs per batch')
+              test_ims_per_id = gr.Number(value=4, label='Images per batch')
 
             with gr.Row():
               test_log_to_file = gr.Radio(choices=['True', 'False'], value='True', label='Save logs to file')
@@ -828,29 +895,82 @@ if __name__ == '__main__':
               test_local_dist_own_hard_sample = gr.Radio(choices=['True', 'False'], value='False', label='Use own hard sample for local distance')
 
             with gr.Row():
-              test_global_margin = gr.Number(value=0.5, label='Global margin for triplet hard loss function')
-              test_local_margin = gr.Number(value=0.5, label='Local margin for triplet hard loss function')
+              test_global_margin = gr.Number(value=0.5, label='Global margin for TriHard loss function')
+              test_local_margin = gr.Number(value=0.5, label='Local margin for TriHard loss function')
             with gr.Row():
               test_g_loss_weight = gr.Number(value=0.5, label='Global loss weight')
               test_l_loss_weight = gr.Number(value=0.5, label='Local loss weight')
               test_id_loss_weight = gr.Number(value=0., label='Identity loss weight')
             
             with gr.Row():
-              test_resume = gr.Radio(choices=['True', 'False'], value='False', label='Resume previous runs')
               test_exp_dir = gr.Textbox(label='Experiment directory (uses root folder if left empty)')
               test_model_weight_file = gr.Textbox(label='Model weight file path (uses available checkpoint if left empty)')
             
-            test_button = gr.Button("Start").style(full_width=True)
+            with gr.Row():
+              test_button = gr.Button("Start").style(full_width=True)
 
           with gr.Column():
-            gr.Markdown("Training & Testing Scores Output")
+            gr.Markdown("Testing Only Scores Output")
             test_scores = gr.Label(num_top_classes=4, label="Evaluation Metrics Scores")
           
       with gr.TabItem("Query Mode"):
-          with gr.Row():
-              image_input = gr.Image()
-              image_output = gr.Image()
-          image_button = gr.Button("Flip")
+        with gr.Row():
+          with gr.Column():
+            with gr.Row():
+              query_image = gr.Image(type='filepath', label='Query image')
+              query_gallery_folder = gr.Textbox(label='Gallery folder path')
+            with gr.Row():
+              query_sys_device_ids = gr.Textbox(value='(0,)', label='System device IDs')
+              query_run = gr.Number(value=1, label='Number of run(s)')
+            with gr.Row():
+              query_set_seed = gr.Radio(choices=['True', 'False'], value='False', label='Use seed to randomize dataset distribution')
+              query_dataset = gr.Radio(choices=['market1501', 'cuhk03', 'duke', 'combined'], value='market1501', label='Person re-ID dataset')
+            with gr.Row():
+              query_trainset_part = gr.Radio(choices=['trainval', 'train'], value='trainval', label='Trainset part')
+              
+              query_resize_h_w = gr.Textbox(value='(224,224)', label='Resize images height & width to (h,w)')
+            with gr.Row():
+              query_crop_prob = gr.Number(value=0, label='Image cropping probability')
+              query_crop_ratio = gr.Number(value=1, label='Cropping ratio (if == 1.0, no cropping)')
+            with gr.Row():
+              query_ids_per_batch = gr.Number(value=16, label='IDs per batch')
+              query_ims_per_id = gr.Number(value=4, label='Images per batch')
+
+            with gr.Row():
+              query_log_to_file = gr.Radio(choices=['True', 'False'], value='True', label='Save logs to file')
+              query_normalize_feature = gr.Radio(choices=['True', 'False'], value='False', label='Normalize feature')
+              query_local_dist_own_hard_sample = gr.Radio(choices=['True', 'False'], value='False', label='Use own hard sample for local distance')
+
+            with gr.Row():
+              query_global_margin = gr.Number(value=0.5, label='Global margin for TriHard loss function')
+              query_local_margin = gr.Number(value=0.5, label='Local margin for TriHard loss function')
+            with gr.Row():
+              query_g_loss_weight = gr.Number(value=0.5, label='Global loss weight')
+              query_l_loss_weight = gr.Number(value=0.5, label='Local loss weight')
+              query_id_loss_weight = gr.Number(value=0., label='Identity loss weight')
+            
+            with gr.Row():
+              query_exp_dir = gr.Textbox(label='Experiment directory (uses root folder if left empty)')
+              query_model_weight_file = gr.Textbox(label='Model weight file path (uses available checkpoint if left empty)')
+            
+            with gr.Row():
+              query_button = gr.Button("Start").style(full_width=True)
+
+          with gr.Column():
+            gr.Markdown("Query Mode Rank-10 Image Results")
+            with gr.Row():
+              query_output_rank01 = gr.Image(type='filepath', label='Rank 1')
+              query_output_rank02 = gr.Image(type='filepath', label='Rank 2')
+              query_output_rank03 = gr.Image(type='filepath', label='Rank 3')
+              query_output_rank04 = gr.Image(type='filepath', label='Rank 4')
+              query_output_rank05 = gr.Image(type='filepath', label='Rank 5')
+            with gr.Row():
+              query_output_rank06 = gr.Image(type='filepath', label='Rank 6')
+              query_output_rank07 = gr.Image(type='filepath', label='Rank 7')
+              query_output_rank08 = gr.Image(type='filepath', label='Rank 8')
+              query_output_rank09 = gr.Image(type='filepath', label='Rank 9')
+              query_output_rank10 = gr.Image(type='filepath', label='Rank 10')
+            query_output_distances = gr.Textbox(label='Query Mode Rank-10 Image Results')
 
     train_button.click(start_train, 
         inputs=[
@@ -875,10 +995,33 @@ if __name__ == '__main__':
             test_ims_per_id, test_log_to_file, test_normalize_feature,
             test_local_dist_own_hard_sample, test_global_margin,
             test_local_margin, test_g_loss_weight, test_l_loss_weight, 
-            test_id_loss_weight, test_resume, test_exp_dir, 
+            test_id_loss_weight, test_exp_dir, 
             test_model_weight_file
           ], 
         outputs=test_scores)
-    image_button.click(start_test, inputs=image_input, outputs=image_output)
+    query_button.click(start_query, 
+        inputs=[
+            query_sys_device_ids, query_run, query_set_seed,
+            query_dataset, query_trainset_part, query_resize_h_w, 
+            query_crop_prob, query_crop_ratio, query_ids_per_batch,
+            query_ims_per_id, query_log_to_file, query_normalize_feature,
+            query_local_dist_own_hard_sample, query_global_margin,
+            query_local_margin, query_g_loss_weight, query_l_loss_weight, 
+            query_id_loss_weight, query_exp_dir, 
+            query_model_weight_file, query_image, query_gallery_folder
+          ], 
+        outputs=[
+          query_output_rank01,
+          query_output_rank02,
+          query_output_rank03,
+          query_output_rank04,
+          query_output_rank05,
+          query_output_rank06,
+          query_output_rank07,
+          query_output_rank08,
+          query_output_rank09,
+          query_output_rank10,
+          query_output_distances
+        ])
 
   app.launch(enable_queue=True)
